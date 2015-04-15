@@ -15,6 +15,20 @@ check_covered <- function(chr, pos, regions){
   }
 }
 
+check_contained <- function(chr, start, stop, regions){
+  
+  # check if region is CONTAINED in another region
+  
+  chrom_regions = regions[regions$chr == chr, c("start", "stop")]
+  match_pos = which(chrom_regions$start <= start & chrom_regions$stop >= stop)
+  if (length(match_pos) == 1){
+    return(paste(chr, chrom_regions$start[match_pos], chrom_regions$stop[match_pos], sep = "."))
+  } else {
+    return(FALSE)
+  }
+}
+
+
 filter_de_novos <- function(regions, de_novos){
   
   # filter de_novos to keep only:
@@ -34,15 +48,25 @@ filter_de_novos <- function(regions, de_novos){
   return(de_novo_filtered)
 }
 
-generate_prior <- function(regions){
+generate_snp_null <- function(regions){
   
-  # generates prior de novo snp at any point each region using trinucleotide mutation model
+  # generates null model probability for snp at any point each region using trinucleotide mutation model
   # TODO: speed this code up
   
   return(unlist(lapply(regions$seq, p_sequence)))  # vector of p_nulls to be set as factor
 }
 
-count_denovos <- function(chr, start, stop, de_novos){
+generate_indel_null <- function(regions, indel2snp, global_mut_rate){
+  
+  # generates null model probability for indel in regions provided with global_mut_rate and indel2snp ratio over regions
+  
+  region_bp = sapply(as.character(regions$seq), nchar)
+  total_bp = sum(region_bp)
+  return(indel2snp*global_mut_rate*region_bp/total_bp)
+}
+
+
+count_denovos <- function(chr, start, stop, de_novos = TRUE){
   
   # count the number of snps and indels in each region that is passed through
   
@@ -57,13 +81,6 @@ count_denovos <- function(chr, start, stop, de_novos){
     n_indel = 0 }
   
   return(c(n_snp, n_indel))
-}
-
-update_counts <- function(regions, de_novos){
-  counts = mapply(count_denovos, regions$chr, regions$start, regions$stop, MoreArgs = list(de_novo_filtered))
-  regions$n_snp = counts[1,]
-  regions$n_indel = counts[2,]
-  return(regions)
 }
 
 assign_to_gene <- function(chr, start, stop, all_gencode){
@@ -90,7 +107,7 @@ assign_to_gene <- function(chr, start, stop, all_gencode){
 
 regions_to_gencode <- function(regions, all_gencode){
   
-  #restricting gencode genes to ONLY protein-coding genes (removes pseudogenes, lincRNA, etc.)
+  # return closest gene (by transcription start site)
   all_gencode <- all_gencode[all_gencode$gene_type == "protein_coding",]
   all_gencode$gene <- factor(all_gencode$gene)  # reset the factors (gene names)
   
@@ -100,8 +117,37 @@ regions_to_gencode <- function(regions, all_gencode){
   all_gencode$true_stop <- all_gencode$stop
   all_gencode$true_stop[all_gencode$strand == "-"] <- all_gencode$start[all_gencode$strand == "-"]
   
-  reg_region_closest_gene = factor(mapply(assign_to_gene, regions$chr, regions$start, regions$stop, MoreArgs = list(all_gencode)))
+  closest_genes = factor(mapply(assign_to_gene, regions$chr, regions$start, regions$stop, MoreArgs = list(all_gencode)))
+
+  return(closest_genes)
+}
+
+get_gencode_sequence <- function(start, stop, region_id, regions){
   
-  regions$closest_gene = reg_region_closest_gene
+  # adds $seq column to regions with sequence context taken from well_covered_regions (done by python script)
+  
+  region = regions[regions$region_id == region_id, c("start", "stop", "seq")]
+  start_idx = start - region$start + 1
+  stop_idx = stop - region$start
+  return(substr(region$seq, start_idx, stop_idx))
+  
+  
+}
+
+expanded_regions <- function(regions, encode_dhs){
+  
+  # need to strip 'chr' off of dhs chromosome tag
+  encode_dhs$dhs_chr = gsub("^chr","",encode_dhs$dhs_chr)
+  
+  contained = unlist(mapply(check_contained, encode_dhs$dhs_chr, encode_dhs$dhs_start, encode_dhs$dhs_end, MoreArgs = list(regions)))
+  
+  encode_dhs_contained = encode_dhs[contained != FALSE, ]
+  encode_dhs_contained$region_id = contained[contained != FALSE]  # region id is ID for region it is CONTAINED IN - useful later on
+  
+  col_names = c("chr", "start", "stop", "closest_gene", "region_id", "seq")
+  encode_dhs_contained$seq = unlist(mapply(get_gencode_sequence, encode_dhs_contained$dhs_start, encode_dhs_contained$dhs_end, encode_dhs_contained$region_id, MoreArgs = list(regions)))
+  names(encode_dhs_contained)[names(encode_dhs_contained) %in% c("dhs_chr", "dhs_start", "dhs_end", "gene_name", "region_id", "seq")] = col_names
+    
+  regions = rbind(regions[,col_names], encode_dhs_contained[,col_names])
   return(regions)
 }

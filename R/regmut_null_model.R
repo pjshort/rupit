@@ -5,6 +5,10 @@
 
 mut_rates <- read.table("/Users/ps14/code/DDD/denovo_regs/data/forSanger_1KG_mutation_rate_table.txt", header=TRUE)
 
+### SNP MODEL - based on sequence context ####
+
+# the indel null model is inferred directly from global snp mutation rate and data - see rupit_core.R for generate_indel_null function
+
 p_all <- function(from){
   
   # probability of mutation from base in position 2 to any of three other possible bases
@@ -22,3 +26,5 @@ p_sequence <- function(sequence){
   return(sum(as.numeric(p)))
   
 }
+
+
