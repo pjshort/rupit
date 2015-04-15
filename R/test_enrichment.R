@@ -14,22 +14,12 @@ de_novo_filtered <- read.table(DENOVOS_FILTERED, sep="\t", header=TRUE)
 well_covered_regions <- read.table(REGIONS_PATH, sep="\t", header=TRUE)
 
 # check that REGIONS_PATH has $region_id - if not, assume each region to be tested independently and assign ids as chr.start.stop
-if (!("region_id" %in% names(well_covered_regions))){
-  well_covered_regions$region_id = paste(well_covered_regions$chr, well_covered_regions$start, well_covered_regions$stop, sep=".")
-}
-
-# check that null model priors have already been calculate
-if (!("p_null" %in% names(well_covered_regions))){
-  well_covered_regions$p_null = generate_prior(well_covered_regions)
-}
-
-# check that snps per region have been calculated. if not, update n_snp, n_indel
-if (!("n_snp" %in% names(well_covered_regions))){
-  well_covered_regions = update_counts(well_covered_regions, de_novo_filtered)
+if (any(!(c("region_id", "p_snp_null", "p_indel_null", "n_snp", "n_indel") %in% names(well_covered_regions)))){
+  print("Need to run pre_process.R on regions, de novos first!")
 }
 
 # set up a new dataframe 'regions' that groups regions by $region_id
-reg = test_enrichment(well_covered_regions, by="region_id")
+regions = test_enrichment(well_covered_regions, by="region_id")
 
 # set up a new dataframe 'genes' that groups regions associated with the same genes together
 genes = test_enrichment(well_covered_regions, by="closest_gene")
