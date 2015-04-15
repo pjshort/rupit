@@ -151,3 +151,38 @@ expanded_regions <- function(regions, encode_dhs){
   regions = rbind(regions[,col_names], encode_dhs_contained[,col_names])
   return(regions)
 }
+
+test_enrichment <- function(targeted_regions, by="region_id"){
+  
+  # takes targeted regions and splits by a factor (typically region_id or closest_gene)
+  # counts n_snps, n_indels and tests results against null model, returning aggregated data frame
+  
+  split_factor = targeted_regions[,by]
+  
+  # count snps
+  snps = aggregate(targeted_regions$n_snp, by = list(name = split_factor), FUN = sum)
+  r = do.call(cbind.data.frame, snps)
+  names(r)[names(r) == "x"] = "n_snp"
+  
+  # count indels
+  r$n_indel = aggregate(targeted_regions$n_indel, by = list(closest_gene = split_factor), FUN = sum)$x
+  
+  # add null model probability
+  r$p_snp_null = aggregate(targeted_regions$p_snp_null, by = list(closest_gene = split_factor), FUN = sum)$x
+  r$p_indel_null = aggregate(targeted_regions$p_indel_null, by = list(closest_gene = split_factor), FUN = sum)$x
+  
+  # count number of regions in each group (relevant if gene-wise) and total bp per group
+  r$n_regions = aggregate(targeted_regions$n_snp, by= list(closest_gene = split_factor), FUN = length)$x
+  r$total_bp = aggregate(targeted_regions$seq, by = list(closest_gene = split_factor), FUN = function(x) sum(as.integer(lapply(as.character(x), nchar))))$x
+  
+  # calculate probability of observing n_snp under p_null (poisson), bonferroni adjustment
+  num_tests = nrow(targeted_regions)
+  num_probands = length(unique(de_novo_full$person_stable_id))
+  
+  r$p_snp_test = dpois(r$n_snp, r$p_snp_null * num_probands)
+  r$p_indel_test = dpois(r$n_indel, r$p_indel_null * num_probands)
+  r$p_snp_adjust = p.adjust(r$p_snp_test, method="bonferroni", n=nrow(r))
+  r$p_indel_adjust = p.adjust(r$p_indel_test, method="bonferroni", n=nrow(r))
+  
+  return(r)
+}
