@@ -13,6 +13,10 @@ de_novo_full <- read.table(DENOVOS_FULL, sep="\t", header=TRUE)
 de_novo_filtered <- read.table(DENOVOS_FILTERED, sep="\t", header=TRUE)
 well_covered_regions <- read.table(REGIONS_PATH, sep="\t", header=TRUE)
 
+# TODO - determine a better way to toggle diagnosed/undiagnosed on and off
+#diagnosed_probands <- read.table("../data/ddd_likely_diagnosed.txt", sep="\t", header=TRUE)
+#de_novo_full <- de_novo_full[!(de_novo_full$person_stable_id %in% diagnosed_probands$person_id),]
+
 # check that REGIONS_PATH has $region_id - if not, assume each region to be tested independently and assign ids as chr.start.stop
 if (any(!(c("region_id", "p_snp_null", "p_indel_null", "n_snp", "n_indel") %in% names(well_covered_regions)))){
   print("Need to run pre_process.R on regions, de novos first!")
@@ -20,9 +24,12 @@ if (any(!(c("region_id", "p_snp_null", "p_indel_null", "n_snp", "n_indel") %in% 
 
 # set up a new dataframe 'regions' that groups regions by $region_id
 regions = test_enrichment(well_covered_regions, by="region_id")
+regions = merge(regions, well_covered_regions[,c("region_id", "closest_gene")], by = "region_id")
+
 
 # set up a new dataframe 'genes' that groups regions associated with the same genes together
 genes = test_enrichment(well_covered_regions, by="closest_gene")
+names(genes)[names(genes) == "region_id"] = "closest_gene"
 
 # save enrichment analysis results
 write.table(regions, file = "../data/regions_enrichment_pvals.txt", sep ="\t", col.names = TRUE)

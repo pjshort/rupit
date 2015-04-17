@@ -43,7 +43,7 @@ well_covered_regions$n_indel = counts[2,]
 well_covered_regions$region_id = paste(well_covered_regions$chr, well_covered_regions$start, well_covered_regions$stop, sep = ".")
 
 # calculate probability of de novo snp (poisson) in each region based on sequence context
-well_covered_regions$p_null_snp = 2 * generate_snp_null(well_covered_regions) # multiply by two to account for diploidy
+well_covered_regions$p_snp_null = 2 * generate_snp_null(well_covered_regions) # multiply by two to account for diploidy
 
 # get global mutation parameters and calculatep_indel_null
 de_novo_noncoding = de_novo_full[de_novo_full$coding == FALSE,]
