@@ -16,7 +16,7 @@ source("/Users/ps14/code/DDD/denovo_regs/R/rupit/R/rupit_core.R")
 # load list of filtered de novos - run rupit_core.R function "filter_denovos" if not yet filtered
 DENOVOS_PATH = "/Users/ps14/code/DDD/denovo_regs/R/rupit/data/de_novo_filtered.txt"
 REGIONS_PATH = "/Users/ps14/code/DDD/denovo_regs/R/rupit/data/regions_annotated.txt"
-iterations = 1000
+iterations = 100
 
 # load data
 de_novo_filtered <- read.table(DENOVOS_PATH, sep="\t", header=TRUE)
@@ -51,11 +51,11 @@ simulate_de_novos <- function(regions, snp_total, iterations){
 }
 
 
-plot_burden <- function(){
+plot_burden <- function(regions, snp_total, iterations){
   
   # plots histograms of the number of genomic regions with 1 de novo, 2+ de novos
   
-  results = simulate_de_novos(well_covered_regions, snp_total, iterations = iterations)
+  results = simulate_de_novos(regions, snp_total, iterations)
   
   single_hits = colSums(results == 1)
   two_or_more = colSums(results > 1)
@@ -77,5 +77,49 @@ plot_burden <- function(){
   
 }
 
-plot_burden()
+simulate_gene <- function(gene_name, sim_results, plot = FALSE, observed_hits = NULL){
+  
+  # return results of simulation for a single gene. plots # observed mutations as histogram plot = TRUE
+  
+  region_match = which(well_covered_regions$closest_gene == gene_name)
+  gene_results = sim_results[region_match,]
+  if (length(region_match) > 1){
+    counts = colSums(gene_results)
+  } else {
+    counts = gene_results
+  }
+  
+  if (plot == TRUE){
+    par(mar=c(5,4,5,1) + 0.5)   # extra large bottom margin
+    h = hist(counts, xlab="# of hits in gene-associated regulatory regions", main="Simulating Recurrent De Novos in Genes", breaks=seq(min(counts)-0.5, max(max(counts), observed_hits)+0.5, 1), col="cyan", xaxt="n")
+    if (!is.null(observed_hits)){
+      abline(v=observed_hits, col="black", lty=3, lw=5)
+      axis(side=1, at = seq(min(h$mids), max(max(h$mids), max(observed_hits))), labels=seq(min(counts),max(max(counts), observed_hits),1))
+    } else {
+      axis(side=1, at = h$mids, labels=seq(min(counts),max(counts),1))
+    }
+  }
+
+  return(gene_results)
+}
+
+gene_sim_likelihood <- function(gene_name, sim_results, observed_hits){
+  
+  # calculates the probability that recurrent de novos >2 number of observed hits were observed in simulation
+  # this is a proxy for likelihood of the observed event under the null model
+  
+  region_match = which(well_covered_regions$closest_gene == gene_name)
+  gene_results = sim_results[region_match,]
+  if (length(region_match) > 1){
+    counts = colSums(gene_results)
+  } else {
+    counts = gene_results
+  }
+
+  trials = length(counts)
+  success = sum(counts >= observed_hits)
+  return(success/trials)
+  
+}
+
 
