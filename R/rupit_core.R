@@ -1,5 +1,4 @@
 # core routines for 'rupit' (regulatory mupit)
-
 source("/Users//ps14/code//DDD/denovo_regs/R/regmut_null_model.R")
 
 check_covered <- function(chr, pos, regions){

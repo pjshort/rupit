@@ -50,30 +50,38 @@ simulate_de_novos <- function(regions, snp_total, iterations){
   return(sim_output)
 }
 
+simulate_de_novos_by_gene <- function(regions, snp_total, iterations){
+  
+  # regions are aggregated by the $closest_gene then de novos are simulated in the exact same manner
+  
+  p_null_gene = aggregate(well_covered_regions$p_snp_null, by = list(closest_gene = well_covered_regions$closest_gene), FUN = sum)
+  genes = do.call(cbind.data.frame, p_null_gene)
+  names(genes)[names(genes) == "x"] = "p_snp_null"
+  
+  sim_output = simulate_de_novos(genes, snp_total, iterations)
+  return(sim_output)
+}
 
-plot_burden <- function(regions, snp_total, iterations){
+plot_burden <- function(sim_results, observed_hits){
   
   # plots histograms of the number of genomic regions with 1 de novo, 2+ de novos
-  
-  results = simulate_de_novos(regions, snp_total, iterations)
-  
-  single_hits = colSums(results == 1)
-  two_or_more = colSums(results > 1)
-  three_or_more = colSums(results > 2)
+  # takes results of simulation (large matrix) and observed hits (length 2 vector corresp to # regions with ==1 and >1)
+    
+  single_hits = colSums(sim_results == 1)
+  two_or_more = colSums(sim_results > 1)
   
   # single de novos
   par(mar=c(5,4,5,1) + 0.5)   # extra large bottom margin
-  h1 = hist(single_hits, xlab="# of regions with 1 denovo", main="Simulating De Novos in Well-Covered Regions", breaks=seq(min(single_hits) - 0.5, max(single_hits)+0.5, 1), col="cyan", xaxt="n")
+  h1 = hist(single_hits, xlab="# of regions with 1 denovo", main = "Single De Novo", breaks=seq(min(single_hits) - 0.5, max(single_hits)+0.5, 1), col="cyan", xaxt="n")
   axis(side=1, at = h1$mids, labels=seq(min(single_hits),max(single_hits),1))
-  observed_single = nrow(well_covered_regions[well_covered_regions$n_snp == 1,])
-  abline(v=observed_single, col="black", lty=3, lw=5)
+  abline(v=observed_hits[1], col="black", lty=3, lw=5)
   
   # double de novos
   par(mar=c(5,4,5,1) + 0.5)   # extra large bottom margin
-  h2 = hist(two_or_more, xlab="# of regions with 2 denovos", main="Simulating De Novos in Well-Covered Regions", breaks=seq(min(two_or_more)-0.5, max(two_or_more)+0.5, 1), col="cyan", xaxt="n")
+  h2 = hist(two_or_more, xlab="# of regions with 2+ denovos", main = "Recurrent De Novos", breaks=seq(min(two_or_more)-0.5, max(two_or_more)+0.5, 1), col="cyan", xaxt="n")
   axis(side=1, at = h2$mids, labels=seq(min(two_or_more),max(two_or_more),1))
   observed_double = nrow(well_covered_regions[well_covered_regions$n_snp == 2,])
-  abline(v=observed_double, col="black", lty=3, lw=5)
+  abline(v=observed_hits[2], col="black", lty=3, lw=5)
   
 }
 
@@ -91,7 +99,7 @@ simulate_gene <- function(gene_name, sim_results, plot = FALSE, observed_hits = 
   
   if (plot == TRUE){
     par(mar=c(5,4,5,1) + 0.5)   # extra large bottom margin
-    h = hist(counts, xlab="# of hits in gene-associated regulatory regions", main="Simulating Recurrent De Novos in Genes", breaks=seq(min(counts)-0.5, max(max(counts), observed_hits)+0.5, 1), col="cyan", xaxt="n")
+    h = hist(counts, xlab="# of hits in gene-associated regulatory regions", main=paste0("Simulating Recurrent De Novos in ", gene_name), breaks=seq(min(counts)-0.5, max(max(counts), observed_hits)+0.5, 1), col="cyan", xaxt="n")
     if (!is.null(observed_hits)){
       abline(v=observed_hits, col="black", lty=3, lw=5)
       axis(side=1, at = seq(min(h$mids), max(max(h$mids), max(observed_hits))), labels=seq(min(counts),max(max(counts), observed_hits),1))
